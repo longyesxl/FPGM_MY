@@ -31,6 +31,8 @@ class GALPRUN():
         self.criterion = nn.CrossEntropyLoss()  
         self.change_mask()
     def change_mask(self,distance_rate=0.1):
+        nub_pruned=0.0
+        nub_all=0.0
         for layer in self.vggnet.features:
             if isinstance(layer, vgg.Conv2d_Mask):
                 weight_torch=layer.Conv2d.weight.data
@@ -41,10 +43,11 @@ class GALPRUN():
                 similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
                 for si_index in similar_small_index:
                     layer.mask.data[si_index,0,0]=0
-                #print(len(torch.nonzero(layer.mask)))
+                nub_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
+                nub_all+=layer.mask.size()[0]
+        print(nub_pruned/nub_all)
 
-
-    def train(self,epoch_time, lr=0.01,momentum=0.9, weight_decay=5e-4):
+    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4):
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
 
         for epoch in range(epoch_time):
@@ -85,4 +88,4 @@ class GALPRUN():
             self.change_mask()
             print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
 
-GALPRUN(128)
+#GALPRUN(128)
