@@ -47,7 +47,7 @@ class GALPRUN():
                 nub_all+=layer.mask.size()[0]
         print(nub_pruned/nub_all)
 
-    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1):
+    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,distance_rate_add=0.0025):
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
 
         for epoch in range(epoch_time):
@@ -86,6 +86,7 @@ class GALPRUN():
                 torch.save(self.vggnet.state_dict(), 'model/vggnet_%03d.pth' % (epoch + 1))
                 ed=time.time()
             self.change_mask(distance_rate=distance_rate)
+            distance_rate+=distance_rate_add
             print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
 
 #GALPRUN(128)
