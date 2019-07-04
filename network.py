@@ -29,7 +29,7 @@ class GALPRUN():
         self.testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
         self.testloader = torch.utils.data.DataLoader(self.testset, batch_size=256, shuffle=True) 
         self.criterion = nn.CrossEntropyLoss()  
-        self.change_mask()
+        #self.change_mask()
     def change_mask(self,distance_rate=0.1):
         nub_pruned=0.0
         nub_all=0.0

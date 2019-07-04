@@ -25,7 +25,7 @@ class Conv2d_Mask(nn.Module):
         super(Conv2d_Mask, self,).__init__()
         #self.mask = torch.randn(c,1, 1, requires_grad=True)
         self.Conv2d=nn.Conv2d(in_channels, v, kernel_size=kernel_size, padding=padding)
-        self.mask = torch.ones(v,1, 1)
+        self.mask = torch.ones(v,1, 1).cuda()
     def forward(self, x):
         y=self.Conv2d(x)
         z=y.mul(self.mask)
