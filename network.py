@@ -87,7 +87,7 @@ class GALPRUN():
                 torch.save(self.vggnet.state_dict(), 'model/vggnet_%03d.pth' % (epoch + 1))
                 ed=time.time()
             self.change_mask(distance_rate=distance_rate)
-            if(i_dis_t>=4):
+            if(i_dis_t>=distance_rate_time):
                 distance_rate+=distance_rate_add
                 i_dis_t=0
             print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
