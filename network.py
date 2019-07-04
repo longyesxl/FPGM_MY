@@ -47,11 +47,12 @@ class GALPRUN():
                 nub_all+=layer.mask.size()[0]
         print(nub_pruned/nub_all)
 
-    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,distance_rate_add=0.0025):
+    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,distance_rate_add=0.01,distance_rate_time=4):
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
-
+        i_dis_t=0
         for epoch in range(epoch_time):
             st=time.time()
+            i_dis_t+=1
             print('\nEpoch: %d' % (epoch + 1))
             self.vggnet.train()
             sum_loss = 0.0
@@ -86,7 +87,9 @@ class GALPRUN():
                 torch.save(self.vggnet.state_dict(), 'model/vggnet_%03d.pth' % (epoch + 1))
                 ed=time.time()
             self.change_mask(distance_rate=distance_rate)
-            distance_rate+=distance_rate_add
+            if(i_dis_t>=4):
+                distance_rate+=distance_rate_add
+                i_dis_t=0
             print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
 
 #GALPRUN(128)
