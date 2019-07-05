@@ -55,32 +55,47 @@ class GALPRUN():
         for layer in self.vggnet.features:
             if isinstance(layer, vgg.Conv2d_Mask):
                 nonz_index=torch.nonzero(layer.mask.view(-1)).view(-1)
-                nonz_nub=len(nonz_index)
                 conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[nonz_index][:,in_channels]
                 conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[nonz_index]
-                model_list_f.append(nonz_nub)
+                conv2d=nn.Conv2d_Mask(len(in_channels), len(nonz_index), kernel_size=kernel_size, padding=padding)
+                conv2d.Conv2d.weight.data.copy_(conv2d_w.cuda())
+                conv2d.Conv2d.bias.data.copy_(conv2d_b.cuda())
+                layer=conv2d
                 in_channels=nonz_index
-                model_list_w.append(in_channels)
             if isinstance(layer, nn.BatchNorm2d):
-                bn=True
-            if isinstance(layer, nn.MaxPool2d):
-                model_list_f.append("M")
+                conv2d_w=torch.ones(layer.weight.data.size()).copy_(layer.weight.data)[in_channels]
+                conv2d_b=torch.ones(layer.bias.data.size()).copy_(layer.bias.data)[in_channels]
+                bn=nn.BatchNorm2d(in_channels)
+                bn.weight.data=conv2d_w.cuda()
+                bn.bias.data=conv2d_b.cuda()
+                layer=bn
+
         for layer in self.vggnet.classifier:
             if isinstance(layer, vgg.Linear_Mask):
                 nonz_index=torch.nonzero(layer.mask.view(-1)).view(-1)
-                nonz_nub=len(nonz_index)
                 linear_w=torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)[nonz_index][:,in_channels]
                 linear_b=torch.ones(layer.Linear.bias.data.size()).copy_(layer.Linear.bias.data)[nonz_index]
-                model_list_c.append(nonz_nub)
+                layer.Linear.weight.resize_as_(linear_w)
+                layer.Linear.weight.resize_as_(linear_b)
+                layer.Linear.weight.data=linear_w.cuda()
+                layer.Linear.bias.data=linear_b.cuda()
+                hs=list(layer.mask.size())
+                hs[0]=layer.Linear.weight.size()[0]
+                layer.mask=torch.ones(hs)
                 in_channels=nonz_index
-                model_list_w.append(in_channels)
             if isinstance(layer, nn.Linear):
                 linear_w=layer.weight.data[:,in_channels]
                 linear_b=layer.bias.data
-                model_list_c.append(len(linear_b))
-                model_list_w.append([0,1,2,3,4,5,6,7,8,9])
+                layer.Linear.weight.resize_as_(linear_w)
+                layer.weight.data=linear_w.cuda()
+            if isinstance(layer, nn.BatchNorm2d):
+                conv2d_w=torch.ones(layer.weight.data.size()).copy_(layer.weight.data)[in_channels]
+                conv2d_b=torch.ones(layer.bias.data.size()).copy_(layer.bias.data)[in_channels]
+                layer.weight.resize_as_(conv2d_w)
+                layer.weight.resize_as_(conv2d_b)
+                layer.weight.data=conv2d_w.cuda()
+                layer.bias.data=conv2d_b.cuda()
 
-        return model_list_f,model_list_c,bn,model_list_w
     def prunself(self):
         mod=self.make_model(is_mask=True)
         self.vggnet=mod.cuda()

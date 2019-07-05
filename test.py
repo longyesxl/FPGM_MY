@@ -1,8 +1,5 @@
 import vgg
 import torch
-def gg():
-    for i in range(10):
-        yield i
 hh=vgg.Conv2d_Mask(3, 3, kernel_size=3, padding=1).cuda()
 hh.Conv2d.weight.data[0]=1
 hh.Conv2d.weight.data[1]=2
@@ -18,10 +15,19 @@ nonz_nub=len(nonz_index)
 conv2d_w=torch.ones(hh.Conv2d.weight.data.size()).copy_(hh.Conv2d.weight.data)[nonz_index]
 conv2d_b=torch.ones(hh.Conv2d.bias.data.size()).copy_(hh.Conv2d.bias.data)[nonz_index]
 gg=vgg.Conv2d_Mask(3, 2, kernel_size=3, padding=1).cuda()
+
 gg.Conv2d.weight.data.copy_(conv2d_w)
 gg.Conv2d.bias.data.copy_(conv2d_b)
+hh.Conv2d.weight.data=conv2d_w.cuda()
+hh.Conv2d.bias.data=conv2d_b.cuda()
+hs=list(hh.mask.size())
+print(hs)
+hs[0]=hh.Conv2d.weight.size()[0]
+hh.mask=torch.ones(hs)
 print(conv2d_w)
 print(conv2d_b)
+print(hh.Conv2d.weight.size())
+print(hh.Conv2d.weight.data.size())
 tryit=torch.ones(1,3,3,3).cuda()
 rz=hh(tryit)
 print(rz)
