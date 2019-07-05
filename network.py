@@ -77,8 +77,20 @@ class GALPRUN():
 
         return model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w
     def prunself(self):
-        mod=self.make_model(self,is_mask=True)
+        mod=self.make_model(is_mask=True)
         self.vggnet=mod
+    def test_model(self,model):
+            with torch.no_grad():
+                correct = 0
+                total = 0
+                for (images, labels) in self.testloader:
+                    model.eval()
+                    images, labels = images.cuda(), labels.cuda()
+                    outputs = model(images)
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum()
+                print('测试分类准确率为：%.3f%%' % (100.0 * correct / total))
     def make_model(self,is_mask=True):
         model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w=self.make_model_list()
         print(len(model_list_c))
@@ -147,7 +159,7 @@ class GALPRUN():
                     nub_c_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
                     nub_c_all+=layer.mask.size()[0]
             print(nub_c_pruned/nub_c_all)
-        
+
     def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,train_add=False,distance_rate_add=0.01,distance_rate_mul=0.1,distance_rate_time=4,train_conv=True,train_linear=False,log_path="train.log"):
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
         self.change_f=train_conv
