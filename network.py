@@ -30,6 +30,8 @@ class GALPRUN():
         self.testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
         self.testloader = torch.utils.data.DataLoader(self.testset, batch_size=256, shuffle=True) 
         self.criterion = nn.CrossEntropyLoss()  
+        self.change_f=True
+        self.change_c=False
     def init_conv2d_distance_rate(self,distance_rate=0.1):
         for layer in self.vggnet.features:
             if isinstance(layer, vgg.Conv2d_Mask):
@@ -102,7 +104,6 @@ class GALPRUN():
                 layer.weight.data.copy_(model_list_c_w[ii][0])
                 layer.bias.data.copy_(model_list_c_w[ii][1])
                 ii+=1
-                print(ii)
             if is_mask==False and isinstance(layer, nn.Linear):
                 layer.weight.data.copy_(model_list_c_w[ii][0])
                 layer.bias.data.copy_(model_list_c_w[ii][1])
@@ -113,41 +114,44 @@ class GALPRUN():
         nub_f_all=0.0
         nub_c_pruned=0.0
         nub_c_all=0.0
-        for layer in self.vggnet.features:
-            if isinstance(layer, vgg.Conv2d_Mask):
-                weight_torch= torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)
-                similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
-                weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
-                similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
-                similar_sum = np.sum(similar_matrix, axis=0)
-                similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
-                zz=torch.ones_like(layer.mask.data).cpu()
-                for si_index in similar_small_index:
-                    zz[si_index,0,0]=0
-                layer.mask.data.copy_(zz)
-                nub_f_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
-                nub_f_all+=layer.mask.size()[0]
-        for layer in self.vggnet.classifier:
-            if isinstance(layer, vgg.Linear_Mask):
-                weight_torch= torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)
+        if self.change_f:
+            for layer in self.vggnet.features:
+                if isinstance(layer, vgg.Conv2d_Mask):
+                    weight_torch= torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)
+                    similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
+                    weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
+                    similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
+                    similar_sum = np.sum(similar_matrix, axis=0)
+                    similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
+                    zz=torch.ones_like(layer.mask.data).cpu()
+                    for si_index in similar_small_index:
+                        zz[si_index,0,0]=0
+                    layer.mask.data.copy_(zz)
+                    nub_f_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
+                    nub_f_all+=layer.mask.size()[0]
+        if self.change_c:
+            for layer in self.vggnet.classifier:
+                if isinstance(layer, vgg.Linear_Mask):
+                    weight_torch= torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)
 
-                similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
-                weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
-                similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
-                similar_sum = np.sum(similar_matrix, axis=0)
-                similar_small_index = similar_sum.argsort()[: similar_pruned_num]
-                zz=torch.ones(layer.mask.data.size())
-                for si_index in similar_small_index:
-                    print(si_index)
-                    zz[si_index]=0
-                layer.mask.data.copy_(zz)
-                nub_c_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
-                nub_c_all+=layer.mask.size()[0]
+                    similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
+                    weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
+                    similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
+                    similar_sum = np.sum(similar_matrix, axis=0)
+                    similar_small_index = similar_sum.argsort()[: similar_pruned_num]
+                    zz=torch.ones(layer.mask.data.size())
+                    for si_index in similar_small_index:
+                        zz[si_index]=0
+                    layer.mask.data.copy_(zz)
+                    nub_c_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
+                    nub_c_all+=layer.mask.size()[0]
         print(nub_f_pruned/nub_f_all)
         print(nub_c_pruned/nub_c_all)
 
     def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,train_add=False,distance_rate_add=0.01,distance_rate_mul=0.1,distance_rate_time=4,train_conv=True,train_linear=False,log_path="train.log"):
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
+        self.change_f=train_conv
+        self.change_c=train_linear
         i_dis_t=0
         f=open("data.txt","w")
         for epoch in range(epoch_time):
@@ -196,13 +200,6 @@ class GALPRUN():
                 self.init_conv2d_distance_rate(distance_rate)
             if train_linear:   
                 self.init_linear_distance_rate(distance_rate)
-            self.change_mask()
-            if(i_dis_t>=distance_rate_time):
-                distance_rate+=distance_rate_add
-                i_dis_t=0
-            print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
-                
-            self.init_linear_distance_rate(distance_rate)
             self.change_mask()
             if(i_dis_t>=distance_rate_time):
                 if train_add:
