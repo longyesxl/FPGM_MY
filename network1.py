@@ -25,13 +25,15 @@ class GALPRUN():
         if(vgg_path!=""):
             self.vggnet.load_state_dict(torch.load(vgg_path))
         self.optimizer = optim.SGD(self.vggnet.parameters(), lr=0.01,momentum=0.9, weight_decay=5e-4)
-        self.trainset = torchvision.datasets.CIFAR10(root='data', train=True, download=True, transform=transform_train) 
-        self.trainloader = torch.utils.data.DataLoader(self.trainset, batch_size=batchSize, shuffle=True) 
-        self.testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
-        self.testloader = torch.utils.data.DataLoader(self.testset, batch_size=256, shuffle=True) 
+        # self.trainset = torchvision.datasets.CIFAR10(root='data', train=True, download=True, transform=transform_train) 
+        # self.trainloader = torch.utils.data.DataLoader(self.trainset, batch_size=batchSize, shuffle=True) 
+        # self.testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
+        # self.testloader = torch.utils.data.DataLoader(self.testset, batch_size=256, shuffle=True) 
         self.criterion = nn.CrossEntropyLoss()  
         self.change_f=True
         self.change_c=False
+        self.init_conv2d_distance_rate()
+        self.make_model()
     def init_conv2d_distance_rate(self,distance_rate=0.1):
         iii=0
         for layer in self.vggnet.features:
@@ -46,10 +48,9 @@ class GALPRUN():
                 layer.distance_rate=distance_rate
     def make_model_list(self):
         model_list_f=[]
+        model_list_w=[[0,1,2]]
         model_list_c=[]
         in_channels=[0,1,2]
-        model_list_f_w=[]
-        model_list_c_w=[]
         bn=False
         for layer in self.vggnet.features:
             if isinstance(layer, vgg.Conv2d_Mask):
@@ -58,13 +59,10 @@ class GALPRUN():
                 conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[nonz_index][:,in_channels]
                 conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[nonz_index]
                 model_list_f.append(nonz_nub)
-                model_list_f_w.append([conv2d_w,conv2d_b])
                 in_channels=nonz_index
+                model_list_w.append(in_channels)
             if isinstance(layer, nn.BatchNorm2d):
                 bn=True
-                conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[in_channels]
-                conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[in_channels]
-                model_list_f_w.append([conv2d_w,conv2d_b])
             if isinstance(layer, nn.MaxPool2d):
                 model_list_f.append("M")
         for layer in self.vggnet.classifier:
@@ -74,20 +72,15 @@ class GALPRUN():
                 linear_w=torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)[nonz_index][:,in_channels]
                 linear_b=torch.ones(layer.Linear.bias.data.size()).copy_(layer.Linear.bias.data)[nonz_index]
                 model_list_c.append(nonz_nub)
-                model_list_c_w.append([linear_w,linear_b])
                 in_channels=nonz_index
+                model_list_w.append(in_channels)
             if isinstance(layer, nn.Linear):
                 linear_w=layer.weight.data[:,in_channels]
                 linear_b=layer.bias.data
                 model_list_c.append(len(linear_b))
-                model_list_c_w.append([linear_w,linear_b])
-            if isinstance(layer, nn.BatchNorm2d):
-                bn=True
-                conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[in_channels]
-                conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[in_channels]
-                model_list_c_w.append([linear_w,linear_b])
+                model_list_w.append([0,1,2,3,4,5,6,7,8,9])
 
-        return model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w
+        return model_list_f,model_list_c,bn,model_list_w
     def prunself(self):
         mod=self.make_model(is_mask=True)
         self.vggnet=mod.cuda()
@@ -103,43 +96,27 @@ class GALPRUN():
                     total += labels.size(0)
                     correct += (predicted == labels).sum()
                 print('测试分类准确率为：%.3f%%' % (100.0 * correct / total))
-    def make_model(self,is_mask=True):
-        model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w=self.make_model_list()
+    def make_model(self,is_mask=False):
+        model_list_f,model_list_c,bn,model_list_w=self.make_model_list()
         print(len(model_list_c))
         features=vgg.make_layers(model_list_f,bn,is_mask=is_mask)
         model_out=vgg.VGG(features,num_classes=10, init_weights=False,cl_n1=model_list_f[-2],cl_n2=model_list_c[0],cl_n3=model_list_c[1],is_mask=is_mask)
         ii=0
-        for layer in model_out.features:
-            if is_mask and isinstance(layer, vgg.Conv2d_Mask):
-                layer.Conv2d.weight.data.copy_(model_list_f_w[ii][0])
-                layer.Conv2d.bias.data.copy_(model_list_f_w[ii][1])
-                ii+=1
-            if is_mask==False and isinstance(layer, nn.Conv2d):
-                layer.weight.data.copy_(model_list_f_w[ii][0])
-                layer.bias.data.copy_(model_list_f_w[ii][1])
-                ii+=1
-            if is_mask==False and isinstance(layer, nn.BatchNorm2d):
-                layer.weight.data.copy_(model_list_f_w[ii][0])
-                layer.bias.data.copy_(model_list_f_w[ii][1])
-                ii+=1
-        ii=0
-        for layer in model_out.classifier:
-            if is_mask and isinstance(layer, vgg.Linear_Mask):
-                layer.Linear.weight.data.copy_(model_list_c_w[ii][0])
-                layer.Linear.bias.data.copy_(model_list_c_w[ii][1])
-                ii+=1
-            if is_mask and isinstance(layer, nn.Linear):
-                layer.weight.data.copy_(model_list_c_w[ii][0])
-                layer.bias.data.copy_(model_list_c_w[ii][1])
-                ii+=1
-            if is_mask==False and isinstance(layer, nn.Linear):
-                layer.weight.data.copy_(model_list_c_w[ii][0])
-                layer.bias.data.copy_(model_list_c_w[ii][1])
-                ii+=1
-            if is_mask==False and isinstance(layer, nn.BatchNorm2d):
-                layer.weight.data.copy_(model_list_c_w[ii][0])
-                layer.bias.data.copy_(model_list_c_w[ii][1])
-                ii+=1
+        for name1,pa1 in model_out.named_parameters():
+            spn1=name1.split(".")
+            for name2,pa2 in self.vggnet.named_parameters():
+                spn2=name2.split(".")
+                if(spn1[0]==spn2[0] and spn1[1]==spn2[1] and spn1[-1]==spn2[-1]):
+                    if(len(pa2.size())>1):
+                        pa1.data.copy_(torch.ones(pa2.data.size()).copy_(pa2.data)[model_list_w[ii+1]][:,model_list_w[ii]])
+                    else:
+                        pa1.data.copy_(torch.ones(pa2.data.size()).copy_(pa2.data)[model_list_w[ii+1]])
+                        ii+=1
+                    print(pa1.size())
+                    print(pa2.size())
+                    print(name1)
+
+        
         return model_out
     def change_mask(self):
         nub_f_pruned=0.0
@@ -241,3 +218,5 @@ class GALPRUN():
                 i_dis_t=0
             print("Training Finished, TotalEPOCH=%d,Epochtime=%d" % (epoch,ed-st))
         f.close()
+
+GALPRUN(128)

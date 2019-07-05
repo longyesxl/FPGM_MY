@@ -1,6 +1,8 @@
 import vgg
 import torch
-
+def gg():
+    for i in range(10):
+        yield i
 hh=vgg.Conv2d_Mask(3, 3, kernel_size=3, padding=1).cuda()
 hh.Conv2d.weight.data[0]=1
 hh.Conv2d.weight.data[1]=2
