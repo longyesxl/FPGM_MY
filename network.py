@@ -146,8 +146,8 @@ class GALPRUN():
         print(nub_f_pruned/nub_f_all)
         print(nub_c_pruned/nub_c_all)
 
-    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,train_add=False,distance_rate_add=0.01,distance_rate_mul=0.1,distance_rate_time=4):
-        self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay,train_conv=True,train_linear=False)
+    def train(self,epoch_time, lr=0.001,momentum=0.9, weight_decay=5e-4,distance_rate=0.1,train_add=False,distance_rate_add=0.01,distance_rate_mul=0.1,distance_rate_time=4,train_conv=True,train_linear=False):
+        self.optimizer = optim.SGD(self.vggnet.parameters(), lr=lr,momentum=momentum, weight_decay=weight_decay)
         i_dis_t=0
         for epoch in range(epoch_time):
             st=time.time()
