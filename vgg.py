@@ -24,27 +24,40 @@ class Conv2d_Mask(nn.Module):
     def __init__(self,in_channels, v, kernel_size, padding):
         super(Conv2d_Mask, self,).__init__()
         #self.mask = torch.randn(c,1, 1, requires_grad=True)
+        self.distance_rate=0
         self.Conv2d=nn.Conv2d(in_channels, v, kernel_size=kernel_size, padding=padding)
-        self.mask = torch.ones(v,1, 1).cuda()
+        self.mask = torch.ones(v,1, 1)
     def forward(self, x):
         y=self.Conv2d(x)
-        z=y.mul(self.mask)
+        z=y.mul(self.mask.cuda())
+        return z
+class Linear_Mask(nn.Module):
+    def __init__(self,in_channels, v):
+        super(Linear_Mask, self,).__init__()
+        #self.mask = torch.randn(c,1, 1, requires_grad=True)
+        self.distance_rate=0
+        self.Linear=nn.Linear(in_channels, v)
+        self.mask = torch.ones(v)
+    def forward(self, x):
+        y=self.Linear(x)
+        z=y.mul(self.mask.cuda())
         return z
 
 class VGG(nn.Module):
 
-    def __init__(self, features, num_classes=10, init_weights=True):
+    def __init__(self, features, num_classes=10, init_weights=True,cl_n1=512,cl_n2=1024,cl_n3=4096):
         super(VGG, self).__init__()
         self.features = features
-        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        #self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
+            Linear_Mask(cl_n1 * 1 * 1, cl_n2),
             nn.ReLU(True),
             nn.Dropout(0.1),
-            nn.Linear(4096, 4096),
+            Linear_Mask(cl_n2, cl_n3),
             nn.ReLU(True),
             nn.Dropout(0.1),
-            nn.Linear(4096, num_classes),
+            nn.Linear(cl_n3, num_classes),
         )
         if init_weights:
             self._initialize_weights()
@@ -101,14 +114,17 @@ class net_D(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-def make_layers(cfg, batch_norm=False):
+def make_layers(cfg, batch_norm=False,is_mask=True):
     layers = []
     in_channels = 3
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
-            conv2d = Conv2d_Mask(in_channels, v, kernel_size=3, padding=1)
+            if is_mask:
+                conv2d = Conv2d_Mask(in_channels, v, kernel_size=3, padding=1)
+            else :
+                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:
@@ -236,5 +252,3 @@ def vgg19_bn(pretrained=False, **kwargs):
         model.load_state_dict(model_zoo.load_url(model_urls['vgg19_bn']))
     return model
 
-
-hh=vgg16()
