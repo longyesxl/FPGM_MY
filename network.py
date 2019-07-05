@@ -62,8 +62,8 @@ class GALPRUN():
                 in_channels=nonz_index
             if isinstance(layer, nn.BatchNorm2d):
                 bn=True
-                conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[in_channels]
-                conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[in_channels]
+                conv2d_w=torch.ones(layer.weight.data.size()).copy_(layer.weight.data)[in_channels]
+                conv2d_b=torch.ones(layer.bias.data.size()).copy_(layer.bias.data)[in_channels]
                 model_list_f_w.append([conv2d_w,conv2d_b])
             if isinstance(layer, nn.MaxPool2d):
                 model_list_f.append("M")
@@ -83,8 +83,8 @@ class GALPRUN():
                 model_list_c_w.append([linear_w,linear_b])
             if isinstance(layer, nn.BatchNorm2d):
                 bn=True
-                conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[in_channels]
-                conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[in_channels]
+                conv2d_w=torch.ones(layer.weight.data.size()).copy_(layer.weight.data)[in_channels]
+                conv2d_b=torch.ones(layer.bias.data.size()).copy_(layer.bias.data)[in_channels]
                 model_list_c_w.append([linear_w,linear_b])
 
         return model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w
