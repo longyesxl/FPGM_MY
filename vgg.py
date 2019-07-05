@@ -45,20 +45,31 @@ class Linear_Mask(nn.Module):
 
 class VGG(nn.Module):
 
-    def __init__(self, features, num_classes=10, init_weights=True,cl_n1=512,cl_n2=1024,cl_n3=4096):
+    def __init__(self, features, num_classes=10, init_weights=True,cl_n1=512,cl_n2=1024,cl_n3=4096,is_mask=True):
         super(VGG, self).__init__()
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         #self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
-        self.classifier = nn.Sequential(
-            Linear_Mask(cl_n1 * 1 * 1, cl_n2),
-            nn.ReLU(True),
-            nn.Dropout(0.1),
-            Linear_Mask(cl_n2, cl_n3),
-            nn.ReLU(True),
-            nn.Dropout(0.1),
-            nn.Linear(cl_n3, num_classes),
-        )
+        if is_mask:
+            self.classifier = nn.Sequential(
+                Linear_Mask(cl_n1 * 1 * 1, cl_n2),
+                nn.ReLU(True),
+                nn.Dropout(0.1),
+                Linear_Mask(cl_n2, cl_n3),
+                nn.ReLU(True),
+                nn.Dropout(0.1),
+                nn.Linear(cl_n3, num_classes),
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Linear(cl_n1 * 1 * 1, cl_n2),
+                nn.ReLU(True),
+                nn.Dropout(0.1),
+                nn.Linear(cl_n2, cl_n3),
+                nn.ReLU(True),
+                nn.Dropout(0.1),
+                nn.Linear(cl_n3, num_classes),
+            )
         if init_weights:
             self._initialize_weights()
     def forward(self, x):

@@ -57,9 +57,8 @@ class GALPRUN():
             if isinstance(layer, vgg.Conv2d_Mask):
                 nonz_index=torch.nonzero(layer.mask.view(-1)).view(-1)
                 nonz_nub=len(nonz_index)
-                print(layer.Conv2d.weight.size())
-                conv2d_w=torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)[nonz_index][:,in_channels]
-                conv2d_b=torch.ones(layer.Conv2d.bias.data.size()).copy_(layer.Conv2d.bias.data)[nonz_index]
+                conv2d_w=layer.Conv2d.weight.data[nonz_index][:,in_channels]
+                conv2d_b=layer.Conv2d.bias.data[nonz_index]
                 model_list_f.append(nonz_nub)
                 model_list_f_w.append([conv2d_w,conv2d_b])
                 in_channels=nonz_index
@@ -71,14 +70,14 @@ class GALPRUN():
             if isinstance(layer, vgg.Linear_Mask):
                 nonz_index=torch.nonzero(layer.mask.view(-1)).view(-1)
                 nonz_nub=len(nonz_index)
-                linear_w=torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)[nonz_index][:,in_channels]
-                linear_b=torch.ones(layer.Linear.bias.data.size()).copy_(layer.Linear.bias.data)[nonz_index]
+                linear_w=layer.Linear.weight.data[nonz_index][:,in_channels]
+                linear_b=layer.Linear.bias.data[nonz_index]
                 model_list_c.append(nonz_nub)
                 model_list_c_w.append([linear_w,linear_b])
                 in_channels=nonz_index
             if isinstance(layer, nn.Linear):
                 linear_w=layer.weight.data[:,in_channels]
-                linear_b=layer.bias.data
+                linear_b=layer.bias.data[nonz_index]
                 model_list_c.append(len(linear_b))
                 model_list_c_w.append([linear_w,linear_b])
 
@@ -91,27 +90,27 @@ class GALPRUN():
         ii=0
         for layer in model_out.features:
             if is_mask and isinstance(layer, vgg.Conv2d_Mask):
-                layer.Conv2d.weight.data.copy_(model_list_f_w[ii][0])
-                layer.Conv2d.bias.data.copy_(model_list_f_w[ii][1])
+                layer.Conv2d.weight.data=model_list_f_w[ii][0]
+                layer.Conv2d.bias.data=model_list_f_w[ii][1]
                 ii+=1
             if is_mask==False and isinstance(layer, nn.Conv2d):
-                layer.weight.data.copy_(model_list_f_w[ii][0])
-                layer.bias.data.copy_(model_list_f_w[ii][1])
+                layer.weight.data=model_list_f_w[ii][0]
+                layer.bias.data=model_list_f_w[ii][1]
                 ii+=1
         ii=0
         for layer in model_out.classifier:
             if is_mask and isinstance(layer, vgg.Linear_Mask):
-                layer.Linear.weight.data.copy_(model_list_c_w[ii][0])
-                layer.Linear.bias.data.copy_(model_list_c_w[ii][1])
+                layer.Linear.weight.data=model_list_c_w[ii][0]
+                layer.Linear.bias.data=model_list_c_w[ii][1]
                 ii+=1
             if is_mask and isinstance(layer, nn.Linear):
-                layer.weight.data.copy_(model_list_c_w[ii][0])
-                layer.bias.data.copy_(model_list_c_w[ii][1])
+                layer.weight.data=model_list_c_w[ii][0]
+                layer.bias.data=model_list_c_w[ii][1]
                 ii+=1
                 print(ii)
             if is_mask==False and isinstance(layer, nn.Linear):
-                layer.weight.data.copy_(model_list_c_w[ii][0])
-                layer.bias.data.copy_(model_list_c_w[ii][1])
+                layer.weight.data=model_list_c_w[ii][0]
+                layer.bias.data=model_list_c_w[ii][1]
                 ii+=1
         return model_out
     def change_mask(self):
@@ -121,35 +120,28 @@ class GALPRUN():
         nub_c_all=0.0
         for layer in self.vggnet.features:
             if isinstance(layer, vgg.Conv2d_Mask):
-                weight_torch= torch.ones(layer.Conv2d.weight.data.size()).copy_(layer.Conv2d.weight.data)
+                weight_torch=layer.Conv2d.weight.data
                 similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
-                weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
+                weight_vec = weight_torch.view(weight_torch.size()[0], -1).cpu().numpy().copy()
                 similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
                 similar_sum = np.sum(similar_matrix, axis=0)
                 similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
-                zz=torch.ones_like(layer.mask.data).cpu()
                 for si_index in similar_small_index:
-                    zz[si_index,0,0]=0
-                layer.mask.data.copy_(zz)
+                    layer.mask.data[si_index,0,0]=0
                 nub_f_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
                 nub_f_all+=layer.mask.size()[0]
-                print(layer.Conv2d.weight.size())
         for layer in self.vggnet.classifier:
             if isinstance(layer, vgg.Linear_Mask):
-                weight_torch= torch.ones(layer.Linear.weight.data.size()).copy_(layer.Linear.weight.data)
-
+                weight_torch=layer.Linear.weight.data
                 similar_pruned_num = int(weight_torch.size()[0] * layer.distance_rate)
-                weight_vec = weight_torch.view(weight_torch.size()[0], -1).numpy()
+                weight_vec = weight_torch.view(weight_torch.size()[0], -1).cpu().numpy()
                 similar_matrix = distance.cdist(weight_vec, weight_vec, 'euclidean')
                 similar_sum = np.sum(similar_matrix, axis=0)
                 similar_small_index = similar_sum.argsort()[: similar_pruned_num]
                 print(similar_small_index.shape)
                 print(layer.mask.data.size())
-                zz=torch.ones(layer.mask.data.size())
                 for si_index in similar_small_index:
-                    print(si_index)
-                    zz[si_index]=0
-                layer.mask.data.copy_(zz)
+                    layer.mask.data[si_index]=0
                 nub_c_pruned+=(layer.mask.size()[0]-len(torch.nonzero(layer.mask)))
                 nub_c_all+=layer.mask.size()[0]
         print(nub_f_pruned/nub_f_all)
