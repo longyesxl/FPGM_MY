@@ -33,9 +33,13 @@ class GALPRUN():
         self.change_f=True
         self.change_c=False
     def init_conv2d_distance_rate(self,distance_rate=0.1):
+        iii=0
         for layer in self.vggnet.features:
+            if iii>3:
+                break
             if isinstance(layer, vgg.Conv2d_Mask):
                 layer.distance_rate=distance_rate
+            iii+=1
     def init_linear_distance_rate(self,distance_rate=0.1):
         for layer in self.vggnet.classifier:
             if isinstance(layer, vgg.Linear_Mask):
