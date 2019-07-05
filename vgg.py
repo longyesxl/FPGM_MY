@@ -45,7 +45,7 @@ class Linear_Mask(nn.Module):
 
 class VGG(nn.Module):
 
-    def __init__(self, features, num_classes=10, init_weights=True,cl_n1=512,cl_n2=1024,cl_n3=4096,is_mask=True):
+    def __init__(self, features, num_classes=10, init_weights=True,cl_n1=512,cl_n2=4096,cl_n3=4096,is_mask=True):
         super(VGG, self).__init__()
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
