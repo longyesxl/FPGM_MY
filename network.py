@@ -78,7 +78,7 @@ class GALPRUN():
         return model_list_f,model_list_c,bn,model_list_f_w,model_list_c_w
     def prunself(self):
         mod=self.make_model(is_mask=True)
-        self.vggnet=mod
+        self.vggnet=mod.cuda()
     def test_model(self,model):
             with torch.no_grad():
                 correct = 0
